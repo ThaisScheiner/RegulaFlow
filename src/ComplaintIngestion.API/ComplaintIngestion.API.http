@@ -1,0 +1,6 @@
+@ComplaintIngestion.API_HostAddress = http://localhost:5160
+
+GET {{ComplaintIngestion.API_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
