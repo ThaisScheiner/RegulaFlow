@@ -1,0 +1,18 @@
+# Arquivos de configuração de desenvolvimento local (CONTÉM SEGREDOS!)
+**/appsettings.Development.json
+.env
+
+# Dependências e arquivos de build
+**/[Bb]in/
+**/[Oo]bj/
+**/[Dd]ebug/
+**/[Rr]elease/
+
+# Arquivos gerados pela IDE
+.vs/
+*.suo
+*.user
+*.sln.docstates
+
+# Arquivos do Rider
+.idea/
