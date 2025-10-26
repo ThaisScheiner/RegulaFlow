@@ -17,7 +17,7 @@ public class SqsPublisherService
         _sqsClient = sqsClient;
         _logger = logger;
         // Usando o parâmetro 'configuration' diretamente e depois ele é "descartado"
-        _queueUrl = configuration["Aws:SqsQueueUrl"] ?? throw new ArgumentNullException("Aws:SqsQueueUrl cannot be null");
+        _queueUrl = configuration["Aws:SqsQueueUrl"] ?? throw new InvalidOperationException("A configuração 'Aws:SqsQueueUrl' está faltando. Verifique seu appsettings.Development.json.");
     }
 
     public async Task PublishComplaintAsync(ComplaintRequest complaint)
