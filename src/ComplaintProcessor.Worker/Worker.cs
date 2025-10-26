@@ -1,26 +1,37 @@
+using Amazon.SimpleNotificationService;
+using Amazon.SimpleNotificationService.Model;
 using Amazon.SQS;
 using Amazon.SQS.Model;
 using ComplaintProcessor.Worker.Data;
+using ComplaintProcessor.Worker.Events;
 using System.Text.Json;
 
 namespace ComplaintProcessor.Worker;
 
-// DTO para deserializar a mensagem da fila. Deve ser idêntico ao Request da API.
 public record ComplaintRequest(string CustomerName, string CustomerEmail, string ComplaintType, string Description);
 
 public class Worker : BackgroundService
 {
     private readonly ILogger<Worker> _logger;
     private readonly IAmazonSQS _sqsClient;
+    private readonly IAmazonSimpleNotificationService _snsClient;
     private readonly IServiceScopeFactory _scopeFactory;
-    private readonly string _queueUrl;
+    private readonly string _sqsQueueUrl;
+    private readonly string _snsTopicArn;
 
-    public Worker(ILogger<Worker> logger, IAmazonSQS sqsClient, IConfiguration configuration, IServiceScopeFactory scopeFactory)
+    public Worker(
+        ILogger<Worker> logger,
+        IAmazonSQS sqsClient,
+        IAmazonSimpleNotificationService snsClient,
+        IConfiguration configuration,
+        IServiceScopeFactory scopeFactory)
     {
         _logger = logger;
         _sqsClient = sqsClient;
+        _snsClient = snsClient;
         _scopeFactory = scopeFactory;
-        _queueUrl = configuration["Aws:SqsQueueUrl"] ?? throw new ArgumentNullException("Aws:SqsQueueUrl cannot be null");
+        _sqsQueueUrl = configuration["Aws:SqsQueueUrl"] ?? throw new ArgumentNullException("Aws:SqsQueueUrl");
+        _snsTopicArn = configuration["Aws:SnsTopicArn"] ?? throw new ArgumentNullException("Aws:SnsTopicArn");
     }
 
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
@@ -33,66 +44,96 @@ public class Worker : BackgroundService
 
             var receiveRequest = new ReceiveMessageRequest
             {
-                QueueUrl = _queueUrl,
-                MaxNumberOfMessages = 5, // Pega até 5 mensagens por vez
-                WaitTimeSeconds = 20     // Long polling: espera até 20s se a fila estiver vazia
+                QueueUrl = _sqsQueueUrl,
+                MaxNumberOfMessages = 5,
+                WaitTimeSeconds = 20
             };
 
             var response = await _sqsClient.ReceiveMessageAsync(receiveRequest, stoppingToken);
 
-            if (response.Messages.Any())
+            // --- CORRECTION HERE ---
+            // This robust check prevents the crash. It checks if `response` is not null,
+            // then if `response.Messages` is not null, and only then calls `.Any()`.
+            if (response?.Messages?.Any() != true)
             {
-                _logger.LogInformation("{count} mensagens recebidas.", response.Messages.Count);
+                _logger.LogInformation("Nenhuma mensagem na fila.");
+                continue; // Skips to the next loop iteration
+            }
 
-                foreach (var message in response.Messages)
+            _logger.LogInformation("{count} mensagens recebidas.", response.Messages.Count);
+            foreach (var message in response.Messages)
+            {
+                try
                 {
-                    try
+                    var complaintRequest = JsonSerializer.Deserialize<ComplaintRequest>(message.Body);
+                    if (complaintRequest is null)
                     {
-                        var complaintRequest = JsonSerializer.Deserialize<ComplaintRequest>(message.Body);
-                        if (complaintRequest is null)
-                        {
-                            _logger.LogWarning("Não foi possível deserializar a mensagem. Body: {body}", message.Body);
-                            continue; // Pula para a próxima mensagem
-                        }
-
-                        _logger.LogInformation("Processando reclamação de {email}", complaintRequest.CustomerEmail);
-
-                        // Mapeia o DTO para a Entidade do banco
-                        var complaintEntity = new Complaint
-                        {
-                            Id = Guid.NewGuid(),
-                            CustomerName = complaintRequest.CustomerName,
-                            CustomerEmail = complaintRequest.CustomerEmail,
-                            ComplaintType = complaintRequest.ComplaintType,
-                            Description = complaintRequest.Description,
-                            ReceivedAt = DateTime.UtcNow,
-                            Status = ComplaintStatus.Received
-                        };
-
-                        // Salva no banco de dados
-                        using (var scope = _scopeFactory.CreateScope())
-                        {
-                            var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                            dbContext.Complaints.Add(complaintEntity);
-                            await dbContext.SaveChangesAsync(stoppingToken);
-                        }
-                        _logger.LogInformation("Reclamação {id} salva no banco de dados.", complaintEntity.Id);
-
-                        // MUITO IMPORTANTE: Apaga a mensagem da fila para não ser processada novamente
-                        await _sqsClient.DeleteMessageAsync(_queueUrl, message.ReceiptHandle, stoppingToken);
-                        _logger.LogInformation("Mensagem {receipt} apagada da fila.", message.ReceiptHandle);
+                        _logger.LogWarning("Não foi possível deserializar a mensagem. Body: {body}", message.Body);
+                        await _sqsClient.DeleteMessageAsync(_sqsQueueUrl, message.ReceiptHandle, stoppingToken); // Delete bad message
+                        continue;
                     }
-                    catch (Exception ex)
+
+                    _logger.LogInformation("Processando reclamação de {email}", complaintRequest.CustomerEmail);
+
+                    var complaintEntity = new Complaint
                     {
-                        _logger.LogError(ex, "Erro ao processar a mensagem {messageId}", message.MessageId);
-                        // Em um cenário real, teria uma lógica para enviar para uma Dead-Letter Queue (DLQ)
+                        Id = Guid.NewGuid(),
+                        CustomerName = complaintRequest.CustomerName,
+                        CustomerEmail = complaintRequest.CustomerEmail,
+                        ComplaintType = complaintRequest.ComplaintType,
+                        Description = complaintRequest.Description,
+                        ReceivedAt = DateTime.UtcNow,
+                        Status = ComplaintStatus.Processing
+                    };
+
+                    using (var scope = _scopeFactory.CreateScope())
+                    {
+                        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                        dbContext.Complaints.Add(complaintEntity);
+                        await dbContext.SaveChangesAsync(stoppingToken);
+                    }
+                    _logger.LogInformation("Reclamação {id} salva no banco de dados.", complaintEntity.Id);
+
+                    await PublishProcessedEvent(complaintEntity, stoppingToken);
+
+                    await _sqsClient.DeleteMessageAsync(_sqsQueueUrl, message.ReceiptHandle, stoppingToken);
+                    _logger.LogInformation("Mensagem {receipt} apagada da fila.", message.ReceiptHandle);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Erro ao processar a mensagem {messageId}", message.MessageId);
+                }
+            }
+        }
+    }
+
+    private async Task PublishProcessedEvent(Complaint complaint, CancellationToken stoppingToken)
+    {
+        var processedEvent = new ComplaintProcessedEvent(
+            complaint.Id,
+            complaint.CustomerEmail,
+            complaint.ComplaintType,
+            DateTime.UtcNow
+        );
+
+        var publishRequest = new PublishRequest
+        {
+            TopicArn = _snsTopicArn,
+            Message = JsonSerializer.Serialize(processedEvent),
+            MessageAttributes = new Dictionary<string, Amazon.SimpleNotificationService.Model.MessageAttributeValue>
+            {
+                {
+                    "EventType",
+                    new Amazon.SimpleNotificationService.Model.MessageAttributeValue
+                    {
+                        DataType = "String",
+                        StringValue = nameof(ComplaintProcessedEvent)
                     }
                 }
             }
-            else
-            {
-                _logger.LogInformation("Nenhuma mensagem na fila.");
-            }
-        }
+        };
+
+        await _snsClient.PublishAsync(publishRequest, stoppingToken);
+        _logger.LogInformation("Evento ComplaintProcessedEvent publicado no tópico SNS para a reclamação {id}", complaint.Id);
     }
 }
