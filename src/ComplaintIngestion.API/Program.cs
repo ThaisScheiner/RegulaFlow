@@ -52,7 +52,7 @@ app.MapControllers();
 try
 {
     Log.Information("Iniciando a API de Ingestão de Reclamações");
-    app.Run();
+    await app.RunAsync();
 }
 catch (Exception ex)
 {
@@ -60,5 +60,5 @@ catch (Exception ex)
 }
 finally
 {
-    Log.CloseAndFlush();
+    await Log.CloseAndFlushAsync();
 }

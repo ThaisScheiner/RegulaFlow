@@ -24,7 +24,7 @@ var host = Host.CreateDefaultBuilder(args)
 try
 {
     Log.Information("Iniciando o Worker de Notificação");
-    host.Run();
+    await host.RunAsync();
 }
 catch (Exception ex)
 {
@@ -32,5 +32,5 @@ catch (Exception ex)
 }
 finally
 {
-    Log.CloseAndFlush();
+    await Log.CloseAndFlushAsync();
 }
