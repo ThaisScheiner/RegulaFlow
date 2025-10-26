@@ -1,16 +1,13 @@
 using Amazon.SQS;
 using Amazon.SQS.Model;
 using ComplaintIngestion.API.Models;
-using System;
 using System.Text.Json;
-using System.Threading.Tasks;
 
 namespace ComplaintIngestion.API.Services;
 
 public class SqsPublisherService
 {
     private readonly IAmazonSQS _sqsClient;
-    private readonly IConfiguration _configuration;
     private readonly ILogger<SqsPublisherService> _logger;
     private readonly string _queueUrl;
 
@@ -18,10 +15,9 @@ public class SqsPublisherService
     public SqsPublisherService(IAmazonSQS sqsClient, IConfiguration configuration, ILogger<SqsPublisherService> logger)
     {
         _sqsClient = sqsClient;
-        _configuration = configuration;
         _logger = logger;
-        // Lemos a URL da fila do appsettings.json
-        _queueUrl = _configuration["Aws:SqsQueueUrl"] ?? throw new ArgumentNullException("Aws:SqsQueueUrl cannot be null");
+        // Usando o parâmetro 'configuration' diretamente e depois ele é "descartado"
+        _queueUrl = configuration["Aws:SqsQueueUrl"] ?? throw new ArgumentNullException("Aws:SqsQueueUrl cannot be null");
     }
 
     public async Task PublishComplaintAsync(ComplaintRequest complaint)
@@ -47,8 +43,7 @@ public class SqsPublisherService
         catch (Exception ex)
         {
             _logger.LogError(ex, "Erro ao enviar mensagem para SQS. Fila: {QueueUrl}", _queueUrl);
-            // Em um cenário real, poderíamos implementar retentativas ou DLQ aqui
-            throw; // Re-lança a exceção para o Controller saber que falhou
+            throw;
         }
     }
 }
