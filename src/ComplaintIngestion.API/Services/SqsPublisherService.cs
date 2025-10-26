@@ -11,7 +11,7 @@ public class SqsPublisherService
     private readonly ILogger<SqsPublisherService> _logger;
     private readonly string _queueUrl;
 
-    // Injetamos o cliente SQS, configurações e logger
+    // Injetando o cliente SQS, configurações e logger
     public SqsPublisherService(IAmazonSQS sqsClient, IConfiguration configuration, ILogger<SqsPublisherService> logger)
     {
         _sqsClient = sqsClient;
