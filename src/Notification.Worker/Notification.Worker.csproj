@@ -1,18 +1,30 @@
 <Project Sdk="Microsoft.NET.Sdk.Worker">
 
-  <PropertyGroup>
-    <TargetFramework>net9.0</TargetFramework>
-    <Nullable>enable</Nullable>
-    <ImplicitUsings>enable</ImplicitUsings>
-    <UserSecretsId>dotnet-Notification.Worker-ae9b173d-43ac-4ea0-8674-3c73d295987e</UserSecretsId>
-  </PropertyGroup>
+	<PropertyGroup>
+		<TargetFramework>net8.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<UserSecretsId>dotnet-Notification.Worker-example-guid</UserSecretsId>
+	</PropertyGroup>
 
-  <ItemGroup>
-    <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="4.0.3.8" />
-    <PackageReference Include="AWSSDK.SQS" Version="4.0.1.12" />
-    <PackageReference Include="Microsoft.Extensions.Hosting" Version="9.0.10" />
-    <PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.0" />
-    <PackageReference Include="Serilog.Settings.Configuration" Version="9.0.0" />
-    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
-  </ItemGroup>
+	<ItemGroup>
+		
+		<PackageReference Include="AWS.Logger.Serilog" Version="3.2.1" />
+
+		<!-- Pacotes da AWS Estáveis (versões 3.x) -->
+		<PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.300" />
+		<PackageReference Include="AWSSDK.SQS" Version="3.7.301.3" />
+
+		<!-- Pacotes do .NET 8 -->
+		<PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+		<PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
+
+		<!-- Pacotes de Terceiros (versões 8.x) -->
+		<PackageReference Include="Polly" Version="8.4.1" />
+
+		<!-- Pacotes de Log (versões 8.x) -->
+		<PackageReference Include="Serilog.Settings.Configuration" Version="8.0.0" />
+		<PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
+	</ItemGroup>
+
 </Project>

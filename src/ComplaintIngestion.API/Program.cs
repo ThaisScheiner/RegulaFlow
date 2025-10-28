@@ -1,11 +1,15 @@
-using Amazon.Extensions.NETCore.Setup; // Adicionar este using
+using Amazon.Extensions.NETCore.Setup;
+using Amazon.Runtime;
 using Amazon.SQS;
 using ComplaintIngestion.API.Services;
+using Polly;
+using Polly.Retry;
 using Serilog;
+using AWS.Logger.Serilog; // <-- Esta linha depende do 'dotnet add package AWS.Logger.Serilog'
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configuração do Serilog (continua igual)
+// Configuração do Serilog (Bootstrap)
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
@@ -13,30 +17,45 @@ Log.Logger = new LoggerConfiguration()
     .WriteTo.Debug()
     .CreateBootstrapLogger();
 
+// Configuração do Serilog para a aplicação
 builder.Host.UseSerilog((context, services, configuration) => configuration
     .ReadFrom.Configuration(context.Configuration)
     .ReadFrom.Services(services)
     .Enrich.FromLogContext()
-    .WriteTo.Console());
+    .WriteTo.Console() // Manter o log de console
+
+    // Este método vem do pacote 'AWS.Logger.Serilog'
+    .WriteTo.AWSSeriLog(context.Configuration)
+);
 
 // Adicionar serviços ao container.
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// --- CORREÇÃO APLICADA AQUI ---
-// 1. Lê a seção "Aws" do appsettings.json e configura as opções padrão da AWS
+// --- Configuração dos Serviços AWS (sem alterações) ---
 builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
-
-// 2. Registra o cliente SQS. Agora ele usará automaticamente a região configurada acima.
 builder.Services.AddAWSService<IAmazonSQS>();
-
-// Registrar nosso serviço SQS (continua igual)
 builder.Services.AddScoped<SqsPublisherService>();
+
+// --- Configuração do Polly (sem alterações) ---
+AsyncRetryPolicy sqsPolicy = Policy
+    .Handle<AmazonServiceException>()
+    .Or<System.Net.Sockets.SocketException>()
+    .WaitAndRetryAsync(
+        retryCount: 3,
+        sleepDurationProvider: (attempt) => TimeSpan.FromSeconds(attempt),
+        onRetry: (exception, timespan, attempt, context) =>
+        {
+            Console.WriteLine($"[Polly-API-SQS] Tentativa {attempt} falhou: {exception.Message}. Tentando novamente em {timespan.TotalSeconds}s...");
+        }
+    );
+builder.Services.AddSingleton(sqsPolicy);
+// --- Fim da Configuração do Polly ---
 
 var app = builder.Build();
 
-// Pipeline de requisições HTTP (continua igual)
+// Pipeline de requisições HTTP (sem alterações)
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -44,11 +63,11 @@ if (app.Environment.IsDevelopment())
 }
 
 app.UseSerilogRequestLogging();
-// app.UseHttpsRedirection(); // Comentado temporariamente para facilitar testes locais em HTTP
+// app.UseHttpsRedirection(); 
 app.UseAuthorization();
 app.MapControllers();
 
-// Bloco try-finally (continua igual)
+// Bloco try-finally (sem alterações)
 try
 {
     Log.Information("Iniciando a API de Ingestão de Reclamações");
