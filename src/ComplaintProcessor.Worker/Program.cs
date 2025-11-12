@@ -69,6 +69,7 @@ var host = Host.CreateDefaultBuilder(args)
         .Enrich.FromLogContext()
         .WriteTo.Console()
     // .WriteTo.CloudWatch() 
+    )
     .Build();
 
 try
