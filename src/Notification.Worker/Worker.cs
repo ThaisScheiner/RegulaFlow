@@ -1,7 +1,7 @@
 using Amazon.SQS;
 using Amazon.SQS.Model;
 using Notification.Worker.Events;
-using Polly; // [Polly] Importar a interface base do Polly
+using Polly; 
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -40,7 +40,7 @@ public class Worker : BackgroundService
         {
             _logger.LogInformation("Verificando a fila de notificações por novas mensagens...");
 
-            // ... (Nenhuma mudança na lógica de recebimento de SQS) ...
+           
             var receiveRequest = new ReceiveMessageRequest
             {
                 QueueUrl = _queueUrl,
@@ -62,7 +62,7 @@ public class Worker : BackgroundService
             {
                 try
                 {
-                    // ... (Nenhuma mudança na lógica de deserialização) ...
+                    
                     if (string.IsNullOrWhiteSpace(message.Body))
                     {
                         _logger.LogWarning("Recebida mensagem com corpo vazio ou nulo. MessageId: {id}", message.MessageId);

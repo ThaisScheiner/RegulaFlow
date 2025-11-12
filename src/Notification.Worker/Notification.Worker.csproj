@@ -8,23 +8,18 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		
-		<PackageReference Include="AWS.Logger.Serilog" Version="3.2.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+	<PackageReference Include="Serilog.Sinks.CloudWatch" Version="6.0.0" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.0" />
 
-		<!-- Pacotes da AWS Estáveis (versões 3.x) -->
-		<PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.300" />
-		<PackageReference Include="AWSSDK.SQS" Version="3.7.301.3" />
+    <PackageReference Include="Serilog.Settings.Configuration" Version="9.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="AWS.Logger.Serilog" Version="3.4.0" />
 
-		<!-- Pacotes do .NET 8 -->
-		<PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
-		<PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.300" />
+    <PackageReference Include="AWSSDK.SQS" Version="3.7.301.3" />
 
-		<!-- Pacotes de Terceiros (versões 8.x) -->
-		<PackageReference Include="Polly" Version="8.4.1" />
-
-		<!-- Pacotes de Log (versões 8.x) -->
-		<PackageReference Include="Serilog.Settings.Configuration" Version="8.0.0" />
-		<PackageReference Include="Serilog.Sinks.Console" Version="5.0.1" />
-	</ItemGroup>
+    <PackageReference Include="Polly" Version="8.6.4" />
+</ItemGroup>
 
 </Project>

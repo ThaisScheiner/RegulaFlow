@@ -4,8 +4,10 @@ using Amazon.SQS;
 using Amazon.SQS.Model;
 using ComplaintProcessor.Worker.Data;
 using ComplaintProcessor.Worker.Events;
-using ComplaintProcessor.Worker.Policies; 
+using ComplaintProcessor.Worker.Policies;
 using System.Text.Json;
+using SqsMessageAttributeValue = Amazon.SQS.Model.MessageAttributeValue;
+using SnsMessageAttributeValue = Amazon.SimpleNotificationService.Model.MessageAttributeValue;
 
 namespace ComplaintProcessor.Worker;
 
@@ -19,8 +21,6 @@ public class Worker : BackgroundService
     private readonly IServiceScopeFactory _scopeFactory;
     private readonly string _sqsQueueUrl;
     private readonly string _snsTopicArn;
-
-    // [Polly] Campos para armazenar nossas políticas injetadas
     private readonly DbResiliencePolicy _dbPolicy;
     private readonly SnsResiliencePolicy _snsPolicy;
 
@@ -30,15 +30,15 @@ public class Worker : BackgroundService
         IAmazonSimpleNotificationService snsClient,
         IConfiguration configuration,
         IServiceScopeFactory scopeFactory,
-        DbResiliencePolicy dbPolicy, // [Polly] Injetando a política de DB
-        SnsResiliencePolicy snsPolicy) // [Polly] Injetando a política de SNS
+        DbResiliencePolicy dbPolicy,
+        SnsResiliencePolicy snsPolicy)
     {
         _logger = logger;
         _sqsClient = sqsClient;
         _snsClient = snsClient;
         _scopeFactory = scopeFactory;
-        _dbPolicy = dbPolicy; // [Polly] Armazenando a política de DB
-        _snsPolicy = snsPolicy; // [Polly] Armazenando a política de SNS
+        _dbPolicy = dbPolicy;
+        _snsPolicy = snsPolicy;
         _sqsQueueUrl = configuration["Aws:SqsQueueUrl"] ?? throw new ArgumentNullException("Aws:SqsQueueUrl");
         _snsTopicArn = configuration["Aws:SnsTopicArn"] ?? throw new ArgumentNullException("Aws:SnsTopicArn");
     }
@@ -51,7 +51,6 @@ public class Worker : BackgroundService
         {
             _logger.LogInformation("Verificando a fila SQS por novas mensagens...");
 
-            
             var receiveRequest = new ReceiveMessageRequest
             {
                 QueueUrl = _sqsQueueUrl,
@@ -68,6 +67,7 @@ public class Worker : BackgroundService
             }
 
             _logger.LogInformation("{count} mensagens recebidas.", response.Messages.Count);
+
             foreach (var message in response.Messages)
             {
                 try
@@ -76,7 +76,7 @@ public class Worker : BackgroundService
                     if (complaintRequest is null)
                     {
                         _logger.LogWarning("Não foi possível deserializar a mensagem. Body: {body}", message.Body);
-                        await _sqsClient.DeleteMessageAsync(_sqsQueueUrl, message.ReceiptHandle, stoppingToken); // Delete bad message
+                        await _sqsClient.DeleteMessageAsync(_sqsQueueUrl, message.ReceiptHandle, stoppingToken);
                         continue;
                     }
 
@@ -91,23 +91,17 @@ public class Worker : BackgroundService
                         Description = complaintRequest.Description,
                         ReceivedAt = DateTime.UtcNow,
                         Status = ComplaintStatus.Processing
+                        // [CORREÇÃO] Removido o "__" que estava aqui
                     };
 
-                    using (var scope = _scopeFactory.CreateScope())
-                    {
-                        var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-                        dbContext.Complaints.Add(complaintEntity);
+                    using var scope = _scopeFactory.CreateScope();
+                    var dbContext = scope.ServiceProvider.GetRequiredService<AppDbContext>();
+                    dbContext.Complaints.Add(complaintEntity);
 
-                        // [Polly] Executamos o SaveChangesAsync dentro da política de resiliência do DB.
-                        // Se o banco de dados estiver offline (ex: MySqlException transiente), 
-                        // o Polly tentará novamente com backoff exponencial.
-                        await _dbPolicy.Policy.ExecuteAsync(async () =>
-                            await dbContext.SaveChangesAsync(stoppingToken)
-                        );
-                    }
+                    await _dbPolicy.Policy.ExecuteAsync(async () => await dbContext.SaveChangesAsync(stoppingToken));
+
                     _logger.LogInformation("Reclamação {id} salva no banco de dados.", complaintEntity.Id);
 
-                    // [Polly] A publicação do evento também é protegida pela sua própria política (SNS).
                     await PublishProcessedEvent(complaintEntity, stoppingToken);
 
                     await _sqsClient.DeleteMessageAsync(_sqsQueueUrl, message.ReceiptHandle, stoppingToken);
@@ -115,12 +109,10 @@ public class Worker : BackgroundService
                 }
                 catch (Exception ex)
                 {
-                    // [Polly] Se a política de DB ou SNS falhar em todas as tentativas, 
-                    // a exceção será capturada aqui, e a mensagem NÃO será apagada da fila.
-                    // Isso garante que ela será reprocessada mais tarde.
                     _logger.LogError(ex, "Erro ao processar a mensagem {messageId}", message.MessageId);
                 }
             }
+            
         }
     }
 
@@ -137,25 +129,23 @@ public class Worker : BackgroundService
         {
             TopicArn = _snsTopicArn,
             Message = JsonSerializer.Serialize(processedEvent),
-            MessageAttributes = new Dictionary<string, Amazon.SimpleNotificationService.Model.MessageAttributeValue>
+            
+            MessageAttributes = new Dictionary<string, SnsMessageAttributeValue>
             {
                 {
                     "EventType",
-                    new Amazon.SimpleNotificationService.Model.MessageAttributeValue
+                    new SnsMessageAttributeValue
                     {
                         DataType = "String",
                         StringValue = nameof(ComplaintProcessedEvent)
                     }
                 }
+                
             }
         };
 
-        // [Polly] Executamos a publicação no SNS dentro da política de Retry do SNS.
-        // Se a API do SNS falhar, o Polly tentará novamente.
-        await _snsPolicy.Policy.ExecuteAsync(async () =>
-            await _snsClient.PublishAsync(publishRequest, stoppingToken)
-        );
+        await _snsPolicy.Policy.ExecuteAsync(async () => await _snsClient.PublishAsync(publishRequest, stoppingToken));
 
-        _logger.LogInformation("Evento ComplaintProcessedEvent publicado no tópico SNS para a reclamação {id}", complaint.Id);
+        _logger.LogInformation("Evento ComplaintProcessedEvent publicado para a reclamação {id}", complaint.Id);
     }
 }

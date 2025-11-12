@@ -6,22 +6,17 @@
     <ImplicitUsings>enable</ImplicitUsings>
   </PropertyGroup>
 
-  <ItemGroup>
-   
-    <!-- Este é o pacote correto da AWS para Serilog (versão 3.x) -->
-    <PackageReference Include="AWS.Logger.Serilog" Version="3.2.1" /> 
-    
-    <!-- Usamos as versões 3.x dos pacotes da AWS, que são as estáveis -->
+	<ItemGroup>
+	<PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.0" />
+	<PackageReference Include="Serilog.Sinks.CloudWatch" Version="6.0.0" />
+    <PackageReference Include="Serilog.AspNetCore" Version="8.0.1" />
+    <PackageReference Include="AWS.Logger.Serilog" Version="3.4.0" />
+
     <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.300" />
     <PackageReference Include="AWSSDK.SQS" Version="3.7.301.3" />
 
-    <!-- Pacotes do .NET 8 -->
-    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="8.0.6" />
-    <PackageReference Include="Serilog.AspNetCore" Version="8.0.1" />
-    
-    <!-- Pacotes de terceiros (versões estáveis) -->
-    <PackageReference Include="Polly" Version="8.4.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.6.2" />
-  </ItemGroup>
+    <PackageReference Include="Polly" Version="8.4.1" />
+</ItemGroup>
 
 </Project>

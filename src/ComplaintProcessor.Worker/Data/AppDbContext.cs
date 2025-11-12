@@ -6,5 +6,5 @@ public class AppDbContext : DbContext
 {
     public AppDbContext(DbContextOptions<AppDbContext> options) : base(options) { }
 
-    public DbSet<Complaint> Complaints { get; set; }
+    public DbSet<Complaint> Complaints { get; set; } = null!;
 }

@@ -1,15 +1,14 @@
-using Amazon.Extensions.NETCore.Setup;
 using Amazon.Runtime;
 using Amazon.SQS;
 using ComplaintIngestion.API.Services;
 using Polly;
 using Polly.Retry;
 using Serilog;
-using AWS.Logger.Serilog; // <-- Esta linha depende do 'dotnet add package AWS.Logger.Serilog'
+
 
 var builder = WebApplication.CreateBuilder(args);
 
-// Configuração do Serilog (Bootstrap)
+// Configuração do Serilog 
 Log.Logger = new LoggerConfiguration()
     .ReadFrom.Configuration(builder.Configuration)
     .Enrich.FromLogContext()
@@ -23,9 +22,7 @@ builder.Host.UseSerilog((context, services, configuration) => configuration
     .ReadFrom.Services(services)
     .Enrich.FromLogContext()
     .WriteTo.Console() // Manter o log de console
-
-    // Este método vem do pacote 'AWS.Logger.Serilog'
-    .WriteTo.AWSSeriLog(context.Configuration)
+   // .WriteTo.CloudWatch()
 );
 
 // Adicionar serviços ao container.
@@ -33,12 +30,12 @@ builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// --- Configuração dos Serviços AWS (sem alterações) ---
+// --- Configuração dos Serviços AWS ---
 builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
 builder.Services.AddAWSService<IAmazonSQS>();
 builder.Services.AddScoped<SqsPublisherService>();
 
-// --- Configuração do Polly (sem alterações) ---
+// --- Configuração do Polly ---
 AsyncRetryPolicy sqsPolicy = Policy
     .Handle<AmazonServiceException>()
     .Or<System.Net.Sockets.SocketException>()
@@ -55,7 +52,7 @@ builder.Services.AddSingleton(sqsPolicy);
 
 var app = builder.Build();
 
-// Pipeline de requisições HTTP (sem alterações)
+// Pipeline de requisições HTTP 
 if (app.Environment.IsDevelopment())
 {
     app.UseSwagger();
@@ -67,7 +64,7 @@ app.UseSerilogRequestLogging();
 app.UseAuthorization();
 app.MapControllers();
 
-// Bloco try-finally (sem alterações)
+
 try
 {
     Log.Information("Iniciando a API de Ingestão de Reclamações");

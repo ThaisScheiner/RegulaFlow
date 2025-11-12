@@ -11,26 +11,23 @@ using System.Net.Sockets;
 using MySqlConnector;
 using ComplaintProcessor.Worker.Policies;
 using Amazon.Extensions.NETCore.Setup;
-using Serilog.Sinks.AmazonCloudWatch;
-using AWS.Logger.Serilog;
 
 var host = Host.CreateDefaultBuilder(args)
     .ConfigureServices((hostContext, services) =>
     {
         var configuration = hostContext.Configuration;
 
-        // 1. Configura o DbContext 
+        // 1. Configura o DbContext
         var connectionString = configuration.GetConnectionString("DefaultConnection");
         services.AddDbContext<AppDbContext>(options =>
             options.UseMySql(connectionString, ServerVersion.AutoDetect(connectionString)));
 
-        // 2. Configura os serviços da AWS 
+        // 2. Configura os serviços da AWS
         services.AddDefaultAWSOptions(configuration.GetAWSOptions());
         services.AddAWSService<IAmazonSQS>();
         services.AddAWSService<IAmazonSimpleNotificationService>();
 
-        // --- Configuração do Polly  ---
-
+        // --- Configuração do Polly ---
         // 3.1. Política do Banco de Dados
         AsyncRetryPolicy dbPolicy = Policy
             .Handle<SocketException>()
@@ -57,32 +54,21 @@ var host = Host.CreateDefaultBuilder(args)
                 }
             );
 
-        // 3.3. Registrar políticas 
+        // 3.3. Registrar políticas
         services.AddSingleton(new DbResiliencePolicy(dbPolicy));
         services.AddSingleton(new SnsResiliencePolicy(snsPolicy));
-
         // --- Fim da Configuração do Polly ---
 
-        // 4. Registra nosso Worker 
+        // 4. Registra  Worker
         services.AddHostedService<Worker>();
     })
-    .UseSerilog((context, services, configuration) => configuration // Configura o Serilog
+ 
+    .UseSerilog((context, services, configuration) => configuration
         .ReadFrom.Configuration(context.Configuration)
         .ReadFrom.Services(services)
         .Enrich.FromLogContext()
-        .WriteTo.Console() // Manter o log de console
-
-        // --- [Observabilidade: CloudWatch] INÍCIO ---
-        .WriteTo.AmazonCloudWatch(
-            // Nome do grupo de logs separado para este Worker
-            logGroup: "/aws/dotnet/RegulaFlow/ComplaintProcessor.Worker",
-            logStreamPrefix: "processor-worker-instance",
-
-            // Puxa as opções da AWS (região, credenciais) da configuração
-            awsOptions: context.Configuration.GetAWSOptions()
-        )
-    // --- [Observabilidade: CloudWatch] FIM ---
-    )
+        .WriteTo.Console()
+    // .WriteTo.CloudWatch() 
     .Build();
 
 try

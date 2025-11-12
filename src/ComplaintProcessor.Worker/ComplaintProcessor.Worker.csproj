@@ -8,27 +8,27 @@
 	</PropertyGroup>
 
 	<ItemGroup>
-		
-		<PackageReference Include="AWS.Logger.Serilog" Version="3.2.1" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
+	<PackageReference Include="Serilog.Sinks.CloudWatch" Version="6.0.0" />
 
-		<!-- Pacotes da AWS Estáveis (versões 3.x) -->
-		<PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.300" />
-		<PackageReference Include="AWSSDK.SimpleNotificationService" Version="3.7.300.22" />
-		<PackageReference Include="AWSSDK.SQS" Version="3.7.301.3" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="9.0.0" />
 
-		<!-- Pacotes do .NET 8 -->
-		<PackageReference Include="Microsoft.Extensions.Hosting" Version="8.0.0" />
-		<PackageReference Include="Serilog.Extensions.Hosting" Version="8.0.0" />
+    <PackageReference Include="Serilog.Settings.Configuration" Version="9.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.0.0" />
+    <PackageReference Include="AWS.Logger.Serilog" Version="3.4.0" />
 
-		<!-- Pacotes do Banco de Dados (versões 8.x) -->
-		<PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.6">
-			<PrivateAssets>all</PrivateAssets>
-			<IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
-		</PackageReference>
-		<PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.2" />
+    <PackageReference Include="AWSSDK.Extensions.NETCore.Setup" Version="3.7.300" />
+    <PackageReference Include="AWSSDK.SQS" Version="3.7.301.3" />
+    <PackageReference Include="AWSSDK.SimpleNotificationService" Version="3.7.300.3" />
 
-		<!-- Pacotes de Terceiros (versões 8.x) -->
-		<PackageReference Include="Polly" Version="8.4.1" />
-	</ItemGroup>
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.6">
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      <PrivateAssets>all</PrivateAssets>
+    </PackageReference>
+    <PackageReference Include="Pomelo.EntityFrameworkCore.MySql" Version="8.0.2" />
+
+    <PackageReference Include="Polly" Version="8.4.1" />
+</ItemGroup>
 
 </Project>
+
